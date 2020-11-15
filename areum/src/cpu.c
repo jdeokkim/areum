@@ -286,7 +286,7 @@ const Instruction instruction_set[256] = {
     { "RNC", 1, i_rnc },
     { "POP rp(D, E)", 1, i_pop_de },
     { "JNC addr", 3, i_jnc_addr },
-    { "OUT data(8)", 2, i_unimpl },
+    { "OUT data(8)", 2, i_out_data8 },
     { "CNC addr", 3, i_cnc_addr },
     { "PUSH rp(D, E)", 1, i_push_de },
     { "SUI data(8)", 2, i_sui_data8 },
@@ -294,7 +294,7 @@ const Instruction instruction_set[256] = {
     { "RC", 1, i_rc },
     { "UNIMPL", 1, i_unimpl },
     { "JC addr", 3, i_jc_addr },
-    { "IN data(8)", 2, i_unimpl },
+    { "IN data(8)", 2, i_in_data8 },
     { "CC addr", 3, i_cc_addr },
     { "UNIMPL", 1, i_unimpl },
     { "SBI data(8)", 2, i_sbi_data8 },
@@ -351,9 +351,17 @@ CPU_IMPL void i8080_cpudiag(CPU *cpu) {
     
     file_size = i8080_load_ram(cpu, CPUDIAG_PATH, 0x100);
     
+    /* `HLT` 명령어로 종료 */
+    cpu->buses.ram[0x00] = 0x76;
+    
+    /* `OUT` 명령어로 메시지 출력 */
+    cpu->buses.ram[0x05] = 0xd3;
+    cpu->buses.ram[0x06] = 0x00;
+    cpu->buses.ram[0x07] = 0xc9;
+    
     info("areum: running %s\n", CPUDIAG_PATH);
     
-    while (cpu->registers.prog_ctr <= file_size + 223)
+    while (!cpu->halted)
         i8080_emulate(cpu);
     
 #ifdef DEBUG
@@ -2188,9 +2196,39 @@ INST_IMPL void i_sphl(CPU *cpu, Operands ops) {
     cpu->registers.stack_ptr = (cpu->registers.h << 8) | (cpu->registers.l);
 }
 
+/* 인텔 8080 명령어: `IN data(8)` (0xdb) */
+INST_IMPL void i_in_data8(CPU *cpu, Operands ops) {
+    /* ... */
+}
+
+/* 인텔 8080 명령어: `OUT data(8)` (0xd3) */
+INST_IMPL void i_out_data8(CPU *cpu, Operands ops) {
+#ifdef CPUDIAG_PATH
+    uint16_t mem_offset;
+    
+    mem_offset = (cpu->registers.d << 8) | (cpu->registers.e);
+    
+    if (ops.operand1 == 0x00) {
+        if (cpu->registers.c == 2) {
+            info("%c", cpu->registers.e);
+        } else if (cpu->registers.c == 9) {
+            do {
+                info("%c", cpu->buses.ram[mem_offset++]);
+            } while (cpu->buses.ram[mem_offset] != '$');
+            
+            info("\n");
+        } else {
+            /* 아무 것도 하지 않는다. */
+        }
+    }
+#endif
+}
+
 /* 인텔 8080 명령어: `HLT` (0x76) */
 INST_IMPL void i_hlt(CPU *cpu, Operands ops) {
-    // 프로세서를 잠시 멈춘다.
+    /* TODO: interrupts? */
+    
+    cpu->halted = true;
 }
 
 /* 인텔 8080 명령어: `NOP` (0x00) */
