@@ -324,7 +324,7 @@ const Instruction instruction_set[256] = {
     { "RP", 1, i_rp },
     { "POP psw", 1, i_pop_psw },
     { "JP addr", 3, i_jp_addr },
-    { "DI", 1, i_unimpl },
+    { "DI", 1, i_di },
     { "CP addr", 3, i_cp_addr },
     { "PUSH psw", 1, i_push_psw },
     { "ORI data(8)", 2, i_ori_data8 },
@@ -332,7 +332,7 @@ const Instruction instruction_set[256] = {
     { "RM", 1, i_rm },
     { "SPHL", 1, i_sphl },
     { "JM addr", 3, i_jm_addr },
-    { "EI", 1, i_unimpl },
+    { "EI", 1, i_ei },
     { "CM addr", 3, i_cm_addr },
     { "UNIMPL", 1, i_unimpl },
     { "CPI data(8)", 2, i_cpi_data8 },
@@ -2224,10 +2224,21 @@ INST_IMPL void i_out_data8(CPU *cpu, Operands ops) {
 #endif
 }
 
+/* 인텔 8080 명령어: `EI` (0xf3) */
+INST_IMPL void i_ei(CPU *cpu, Operands ops) {
+    /* TODO: interrupts? */
+    cpu->interrupt = true;
+}
+
+/* 인텔 8080 명령어: `DI` (0xfb) */
+INST_IMPL void i_di(CPU *cpu, Operands ops) {
+    /* TODO: interrupts? */
+    cpu->interrupt = false;
+}
+
 /* 인텔 8080 명령어: `HLT` (0x76) */
 INST_IMPL void i_hlt(CPU *cpu, Operands ops) {
     /* TODO: interrupts? */
-    
     cpu->halted = true;
 }
 

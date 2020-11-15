@@ -71,7 +71,7 @@ typedef struct cpu {
     Registers registers;
     Buses buses;
     bool halted;
-    bool interrupted;
+    bool interrupt;
 } CPU;
 
 /* 인텔 8080 CPU의 명령어 피연산자를 나타내는 구조체 */
@@ -913,6 +913,12 @@ INST_IMPL void i_out_data8(CPU *cpu, Operands ops);
 
 /* 인텔 8080 명령어: `SPHL` (0xf9) */
 INST_IMPL void i_sphl(CPU *cpu, Operands ops);
+
+/* 인텔 8080 명령어: `EI` (0xf3) */
+INST_IMPL void i_ei(CPU *cpu, Operands ops);
+
+/* 인텔 8080 명령어: `DI` (0xfb) */
+INST_IMPL void i_di(CPU *cpu, Operands ops);
 
 /* 인텔 8080 명령어: `HLT` (0x76) */
 INST_IMPL void i_hlt(CPU *cpu, Operands ops);
