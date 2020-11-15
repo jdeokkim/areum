@@ -1,0 +1,7 @@
+*.manifest
+.idea/
+**/.vs/
+**/bin/
+**/tmp/
+**/**/Debug/
+**/**/Release/
