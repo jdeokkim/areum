@@ -609,9 +609,6 @@ INST_IMPL void i_dcx_de(CPU *cpu, Operands ops);
 /* 인텔 8080 명령어: `DCX rp(H, L)` (0x2b) */
 INST_IMPL void i_dcx_hl(CPU *cpu, Operands ops);
 
-/* 인텔 8080 명령어: `DAA` (0x27) */
-INST_IMPL void i_daa(CPU *cpu, Operands ops);
-
 /* 인텔 8080 명령어: `DAD rp(B, C)` (0x09) */
 INST_IMPL void i_dad_bc(CPU *cpu, Operands ops);
 
@@ -623,6 +620,9 @@ INST_IMPL void i_dad_hl(CPU *cpu, Operands ops);
 
 /* 인텔 8080 명령어: `DAD r(SP)` (0x39) */
 INST_IMPL void i_dad_sp(CPU *cpu, Operands ops);
+
+/* 인텔 8080 명령어: `DAA` (0x27) */
+INST_IMPL void i_daa(CPU *cpu, Operands ops);
 
 /* 
     :: LOGICAL GROUP ::

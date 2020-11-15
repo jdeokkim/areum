@@ -45,7 +45,7 @@ const Instruction instruction_set[256] = {
     { "MVI r(B), data(8)", 2, i_mvi_b_data8 },
     { "RLC", 1, i_rlc },
     { "UNIMPL", 1, i_unimpl },
-    { "DAD rp(B, C)", 1, i_unimpl },
+    { "DAD rp(B, C)", 1, i_dad_bc },
     { "LDAX rp(B, C)", 1, i_ldax_bc },
     { "DCX rp(B, C)", 1, i_dcx_bc },
     { "INR r(C)", 1, i_inr_c },
@@ -64,7 +64,7 @@ const Instruction instruction_set[256] = {
     { "MVI r(D), data(8)", 2, i_mvi_d_data8 },
     { "RAL", 1, i_ral },
     { "UNIMPL", 1, i_unimpl },
-    { "DAD rp(D, E)", 1, i_unimpl },
+    { "DAD rp(D, E)", 1, i_dad_de },
     { "LDAX rp(D, E)", 1, i_ldax_de },
     { "DCX rp(D, E)", 1, i_dcx_de },
     { "INR r(E)", 1, i_inr_e },
@@ -81,9 +81,9 @@ const Instruction instruction_set[256] = {
     { "INR r(H)", 1, i_inr_h },
     { "DCR r(H)", 1, i_dcr_h },
     { "MVI r(H), data(8)", 2, i_mvi_h_data8 },
-    { "DAA", 1, i_unimpl },
+    { "DAA", 1, i_daa },
     { "UNIMPL", 1, i_unimpl },
-    { "DAD rp(H, L)", 1, i_unimpl },
+    { "DAD rp(H, L)", 1, i_dad_hl },
     { "LHLD addr", 3, i_lhld_addr },
     { "DCX rp(H, L)", 1, i_dcx_hl },
     { "INR r(L)", 1, i_inr_l },
@@ -102,7 +102,7 @@ const Instruction instruction_set[256] = {
     { "MVI mem, data(8)", 2, i_mvi_mem_data8 },
     { "STC", 1, i_stc },
     { "UNIMPL", 1, i_unimpl },
-    { "DAD r(SP)", 1, i_unimpl },
+    { "DAD r(SP)", 1, i_dad_sp },
     { "LDA addr", 3, i_lda_addr },
     { "DCX r(SP)", 1, i_dcx_sp },
     { "INR r(A)", 1, i_inr_a },
@@ -353,7 +353,7 @@ CPU_IMPL void i8080_cpudiag(CPU *cpu) {
     
     info("areum: running %s\n", CPUDIAG_PATH);
     
-    while (cpu->registers.prog_ctr <= file_size)
+    while (cpu->registers.prog_ctr <= file_size + 223)
         i8080_emulate(cpu);
     
 #ifdef DEBUG
@@ -610,7 +610,7 @@ INST_IMPL void _i_sub(CPU *cpu, uint16_t value) {
 
 /* 인텔 8080 명령어: `INX rp(X, Y)` */
 INST_IMPL void _i_inx(CPU *cpu, uint8_t *reg1, uint8_t *reg2) {
-    *reg2++;
+    (*reg2)++;
     
     /*
         예시)
@@ -619,12 +619,12 @@ INST_IMPL void _i_inx(CPU *cpu, uint8_t *reg1, uint8_t *reg2) {
             -> 0b00000001 00000000
     */
     if (*reg2 == 0)
-        *reg1++;
+        (*reg1)++;
 }
 
 /* 인텔 8080 명령어: `DCX rp(X, Y)` */
 INST_IMPL void _i_dcx(CPU *cpu, uint8_t *reg1, uint8_t *reg2) {
-    *reg2--;
+    (*reg2)--;
     
     /*
         예시)
@@ -633,7 +633,7 @@ INST_IMPL void _i_dcx(CPU *cpu, uint8_t *reg1, uint8_t *reg2) {
             -> 0b00000000 11111111
     */
     if (*reg2 == 0xff)
-        *reg1--;
+        (*reg1)--;
 }
 
 /* 인텔 8080 명령어: `DAD rp(X, Y)` */
@@ -644,18 +644,18 @@ INST_IMPL void _i_dad(CPU *cpu, uint8_t *reg1, uint8_t *reg2) {
         single precision: 16-bit (0x00000000 - 0x0000ffff)
         double precision: 32-bit (0x00000000 - 0xffffffff)
     */
-    result = (uint32_t) (cpu->registers.h) << 8 | (uint32_t) cpu->registers.l
-             + (uint32_t) (*reg1) << 8 | (uint32_t) *reg2;
+    result = ((uint32_t) (cpu->registers.h) << 8 | (uint32_t) cpu->registers.l)
+             + ((uint32_t) (*reg1) << 8 | (uint32_t) (*reg2));
     
     i8080_flag_update_cy16(cpu, result);
     
-    *reg1 = (result & 0xff00) >> 8;
-	*reg2 = result & 0xff;
+    cpu->registers.h = (result & 0xff00) >> 8;
+	cpu->registers.l = result & 0xff;
 }
 
 /* 인텔 8080 명령어: `INR r(X)` */
 INST_IMPL void _i_inr(CPU *cpu, uint8_t *reg) {
-    *reg++;
+    (*reg)++;
     
     i8080_flag_update_ac_ari(cpu, *reg, 1);
     i8080_flag_update_zsp(cpu, *reg);
@@ -663,7 +663,7 @@ INST_IMPL void _i_inr(CPU *cpu, uint8_t *reg) {
 
 /* 인텔 8080 명령어: `DCR r(X)` */
 INST_IMPL void _i_dcr(CPU *cpu, uint8_t *reg) {
-    *reg--;
+    (*reg)--;
     
     i8080_flag_update_ac_ari(cpu, *reg, 1);
     i8080_flag_update_zsp(cpu, *reg);
@@ -1506,7 +1506,7 @@ INST_IMPL void i_dcx_bc(CPU *cpu, Operands ops) {
 
 /* 인텔 8080 명령어: `DCX rp(D, E)` (0x1b) */
 INST_IMPL void i_dcx_de(CPU *cpu, Operands ops) {
-    _i_dcx(cpu, &cpu->registers.b, &cpu->registers.c);
+    _i_dcx(cpu, &cpu->registers.d, &cpu->registers.e);
 }
 
 /* 인텔 8080 명령어: `DCX rp(H, L)` (0x2b) */
@@ -1517,11 +1517,6 @@ INST_IMPL void i_dcx_hl(CPU *cpu, Operands ops) {
 /* 인텔 8080 명령어: `DCX r(SP)` (0x3b) */
 INST_IMPL void i_dcx_sp(CPU *cpu, Operands ops) {
     cpu->registers.stack_ptr--;
-}
-
-/* 인텔 8080 명령어: `DAA` (0x27) */
-INST_IMPL void i_daa(CPU *cpu, Operands ops) {
-    /* TODO: SR_FLAG_AUX_CARRY */
 }
 
 /* 인텔 8080 명령어: `DAD rp(B, C)` (0x09) */
@@ -1549,6 +1544,41 @@ INST_IMPL void i_dad_sp(CPU *cpu, Operands ops) {
     i8080_flag_update_cy16(cpu, result);
     
     cpu->registers.stack_ptr = (uint16_t) result;
+}
+
+/* 인텔 8080 명령어: `DAA` (0x27) */
+INST_IMPL void i_daa(CPU *cpu, Operands ops) {
+    /*
+        1. `cpu->registers.a`의 하위 4비트가 9보다 크거나, 
+           보조 캐리 플래그가 설정되어 있을 경우 `cpu->registers.a += 0x06`
+        
+        2. 1번 과정이 끝난 후에 `cpu->registers.a`의 상위 4비트가 
+           9보다 크거나, 캐리 플래그가 설정되어 있을 경우 `cpu->registers.a += 0x60`
+    */
+    
+    uint8_t result;
+    
+    result = cpu->registers.a;
+    
+    if ((cpu->registers.a & 0x0f) > 0x09 
+        || i8080_flag_get(cpu, SR_FLAG_AUX_CARRY)) {
+        result += 0x06;
+        i8080_flag_set(cpu, SR_FLAG_CARRY);
+    } else {
+        i8080_flag_clear(cpu, SR_FLAG_AUX_CARRY);
+    }
+    
+    if (cpu->registers.a > 0x9f 
+        || i8080_flag_get(cpu, SR_FLAG_CARRY)) {
+        result += 0x60;
+        i8080_flag_set(cpu, SR_FLAG_CARRY);
+    } else {
+        i8080_flag_clear(cpu, SR_FLAG_CARRY);
+    }
+    
+    i8080_flag_update_zsp(cpu, result);
+    
+    cpu->registers.a = result;
 }
 
 /* 
@@ -1766,10 +1796,12 @@ INST_IMPL void i_rlc(CPU *cpu, Operands ops) {
                           맨 오른쪽으로 이동하였다.
     */
     
-    cpu->registers.a = (temp << 1) | ((temp & 1) >> 7);
+    cpu->registers.a = (temp << 1) | ((temp & 0x80) >> 7);
     
-    if (temp & 1)
+    if (temp & 0x80)
         i8080_flag_set(cpu, SR_FLAG_CARRY);
+    else
+        i8080_flag_clear(cpu, SR_FLAG_CARRY);
 }
 
 /* 인텔 8080 명령어: `RRC` (0x0f) */
@@ -1792,6 +1824,8 @@ INST_IMPL void i_rrc(CPU *cpu, Operands ops) {
     
     if (temp & 1)
         i8080_flag_set(cpu, SR_FLAG_CARRY);
+    else
+        i8080_flag_clear(cpu, SR_FLAG_CARRY);
 }
 
 /* 인텔 8080 명령어: `RAL` (0x17) */
@@ -1802,8 +1836,10 @@ INST_IMPL void i_ral(CPU *cpu, Operands ops) {
     
     cpu->registers.a = (temp << 1) | i8080_flag_get(cpu, SR_FLAG_CARRY);
     
-    if (temp & 1)
+    if (temp & 0x80)
         i8080_flag_set(cpu, SR_FLAG_CARRY);
+    else
+        i8080_flag_clear(cpu, SR_FLAG_CARRY);
 }
 
 /* 인텔 8080 명령어: `RAR` (0x1f) */
@@ -1816,6 +1852,8 @@ INST_IMPL void i_rar(CPU *cpu, Operands ops) {
 
     if (temp & 1)
         i8080_flag_set(cpu, SR_FLAG_CARRY);
+    else
+        i8080_flag_clear(cpu, SR_FLAG_CARRY);
 }
 
 /* 인텔 8080 명령어: `CMA` (0x2f) */
