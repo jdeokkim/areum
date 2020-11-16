@@ -123,11 +123,11 @@ CPU_IMPL void i8080_flag_update_zsp(CPU *cpu, uint8_t result);
 /* 인텔 8080 CPU의 주기억장치의 `mem_offset` 위치로 파일을 불러온다. */
 CPU_IMPL size_t i8080_load_ram(CPU *cpu, const char *file_name, uint16_t mem_offset);
 
-/* 인텔 8080 CPU의 H와 L 레지스터에 저장된 메모리 주소에 있는 값을 읽는다. */
-CPU_IMPL uint8_t i8080_mem_read_hl(CPU *cpu);
+/* 인텔 8080 CPU의 X와 Y 레지스터에 저장된 메모리 주소에 있는 값을 읽는다. */
+CPU_IMPL uint8_t i8080_mem_read(CPU *cpu, uint8_t *rx, uint8_t *ry);
 
-/* 인텔 8080 CPU의 H와 L 레지스터에 저장된 메모리 주소에 있는 값을 수정한다. */
-CPU_IMPL void i8080_mem_write_hl(CPU *cpu, uint8_t value);
+/* 인텔 8080 CPU의 X와 Y 레지스터에 저장된 메모리 주소에 있는 값을 수정한다. */
+CPU_IMPL void i8080_mem_write(CPU *cpu, uint8_t *rx, uint8_t *ry, uint8_t value);
 
 /* 인텔 8080 CPU 구조체를 초기화한다. */
 CPU_IMPL CPU i8080_new(void);
@@ -139,19 +139,19 @@ INST_IMPL void _i_add(CPU *cpu, uint16_t value);
 INST_IMPL void _i_sub(CPU *cpu, uint16_t value);
 
 /* 인텔 8080 명령어: `INX rp(X, Y)` */
-INST_IMPL void _i_inx(CPU *cpu, uint8_t *reg1, uint8_t *reg2);
+INST_IMPL void _i_inx(CPU *cpu, uint8_t *rx, uint8_t *ry);
 
 /* 인텔 8080 명령어: `DCX rp(X, Y)` */
-INST_IMPL void _i_dcx(CPU *cpu, uint8_t *reg1, uint8_t *reg2);
+INST_IMPL void _i_dcx(CPU *cpu, uint8_t *rx, uint8_t *ry);
 
 /* 인텔 8080 명령어: `DAD rp(X, Y)` */
-INST_IMPL void _i_dad(CPU *cpu, uint8_t *reg1, uint8_t *reg2);
+INST_IMPL void _i_dad(CPU *cpu, uint8_t *rx, uint8_t *ry);
 
 /* 인텔 8080 명령어: `INR r(X)` */
-INST_IMPL void _i_inr(CPU *cpu, uint8_t *reg);
+INST_IMPL void _i_inr(CPU *cpu, uint8_t *rx);
 
 /* 인텔 8080 명령어: `DCR r(X)` */
-INST_IMPL void _i_dcr(CPU *cpu, uint8_t *reg);
+INST_IMPL void _i_dcr(CPU *cpu, uint8_t *rx);
 
 /* 인텔 8080 명령어: `ANA r(X)` */
 INST_IMPL void _i_ana(CPU *cpu, uint16_t value);
@@ -164,6 +164,12 @@ INST_IMPL void _i_ora(CPU *cpu, uint16_t value);
 
 /* 인텔 8080 명령어: `CMP r(X)` */
 INST_IMPL void _i_cmp(CPU *cpu, uint16_t value);
+
+/* 인텔 8080 명령어: `PUSH rp(X, Y)` */
+INST_IMPL void _i_push(CPU *cpu, uint8_t *rx, uint8_t *ry);
+
+/* 인텔 8080 명령어: `POP r(X, Y)` */
+INST_IMPL void _i_pop(CPU *cpu, uint8_t *rx, uint8_t *ry);
 
 /* 인텔 8080 명령어: `RST n` */
 INST_IMPL void _i_rst(CPU *cpu, uint8_t value);

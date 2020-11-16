@@ -557,16 +557,16 @@ CPU_IMPL size_t i8080_load_ram(CPU *cpu, const char *file_name, uint16_t mem_off
     return read_size;
 }
 
-/* 인텔 8080 CPU의 H와 L 레지스터에 저장된 메모리 주소에 있는 값을 읽는다. */
-CPU_IMPL uint8_t i8080_mem_read_hl(CPU *cpu) {
-    uint16_t mem_offset = (cpu->registers.h << 8) | (cpu->registers.l);
+/* 인텔 8080 CPU의 X와 Y 레지스터에 저장된 메모리 주소에 있는 값을 읽는다. */
+CPU_IMPL uint8_t i8080_mem_read(CPU *cpu, uint8_t *rx, uint8_t *ry) {
+    uint16_t mem_offset = ((*rx) << 8) | (*ry);
     
     return cpu->buses.ram[mem_offset];
 }
 
-/* 인텔 8080 CPU의 H와 L 레지스터에 저장된 메모리 주소에 있는 값을 수정한다. */
-CPU_IMPL void i8080_mem_write_hl(CPU *cpu, uint8_t value) {
-    uint16_t mem_offset = (cpu->registers.h << 8) | (cpu->registers.l);
+/* 인텔 8080 CPU의 X와 Y 레지스터에 저장된 메모리 주소에 있는 값을 수정한다. */
+CPU_IMPL void i8080_mem_write(CPU *cpu, uint8_t *rx, uint8_t *ry, uint8_t value) {
+    uint16_t mem_offset = ((*rx) << 8) | (*ry);
     
     cpu->buses.ram[mem_offset] = value;
 }
@@ -617,8 +617,8 @@ INST_IMPL void _i_sub(CPU *cpu, uint16_t value) {
 }
 
 /* 인텔 8080 명령어: `INX rp(X, Y)` */
-INST_IMPL void _i_inx(CPU *cpu, uint8_t *reg1, uint8_t *reg2) {
-    (*reg2)++;
+INST_IMPL void _i_inx(CPU *cpu, uint8_t *rx, uint8_t *ry) {
+    (*ry)++;
     
     /*
         예시)
@@ -626,13 +626,13 @@ INST_IMPL void _i_inx(CPU *cpu, uint8_t *reg1, uint8_t *reg2) {
                0b00000000 11111111
             -> 0b00000001 00000000
     */
-    if (*reg2 == 0)
-        (*reg1)++;
+    if (*ry == 0)
+        (*rx)++;
 }
 
 /* 인텔 8080 명령어: `DCX rp(X, Y)` */
-INST_IMPL void _i_dcx(CPU *cpu, uint8_t *reg1, uint8_t *reg2) {
-    (*reg2)--;
+INST_IMPL void _i_dcx(CPU *cpu, uint8_t *rx, uint8_t *ry) {
+    (*ry)--;
     
     /*
         예시)
@@ -640,12 +640,12 @@ INST_IMPL void _i_dcx(CPU *cpu, uint8_t *reg1, uint8_t *reg2) {
                0b00000001 00000000
             -> 0b00000000 11111111
     */
-    if (*reg2 == 0xff)
-        (*reg1)--;
+    if (*ry == 0xff)
+        (*rx)--;
 }
 
 /* 인텔 8080 명령어: `DAD rp(X, Y)` */
-INST_IMPL void _i_dad(CPU *cpu, uint8_t *reg1, uint8_t *reg2) {
+INST_IMPL void _i_dad(CPU *cpu, uint8_t *rx, uint8_t *ry) {
     uint32_t result;
     
     /*
@@ -653,7 +653,7 @@ INST_IMPL void _i_dad(CPU *cpu, uint8_t *reg1, uint8_t *reg2) {
         double precision: 32-bit (0x00000000 - 0xffffffff)
     */
     result = ((uint32_t) (cpu->registers.h) << 8 | (uint32_t) cpu->registers.l)
-             + ((uint32_t) (*reg1) << 8 | (uint32_t) (*reg2));
+             + ((uint32_t) (*rx) << 8 | (uint32_t) (*ry));
     
     i8080_flag_update_cy16(cpu, result);
     
@@ -662,19 +662,19 @@ INST_IMPL void _i_dad(CPU *cpu, uint8_t *reg1, uint8_t *reg2) {
 }
 
 /* 인텔 8080 명령어: `INR r(X)` */
-INST_IMPL void _i_inr(CPU *cpu, uint8_t *reg) {
-    (*reg)++;
+INST_IMPL void _i_inr(CPU *cpu, uint8_t *rx) {
+    (*rx)++;
     
-    i8080_flag_update_ac_ari(cpu, *reg, 1);
-    i8080_flag_update_zsp(cpu, *reg);
+    i8080_flag_update_ac_ari(cpu, *rx, 1);
+    i8080_flag_update_zsp(cpu, *rx);
 }
 
 /* 인텔 8080 명령어: `DCR r(X)` */
-INST_IMPL void _i_dcr(CPU *cpu, uint8_t *reg) {
-    (*reg)--;
+INST_IMPL void _i_dcr(CPU *cpu, uint8_t *rx) {
+    (*rx)--;
     
-    i8080_flag_update_ac_ari(cpu, *reg, 1);
-    i8080_flag_update_zsp(cpu, *reg);
+    i8080_flag_update_ac_ari(cpu, *rx, 1);
+    i8080_flag_update_zsp(cpu, *rx);
 }
 
 /* 인텔 8080 명령어: `ANA r(X)` */
@@ -730,6 +730,22 @@ INST_IMPL void _i_cmp(CPU *cpu, uint16_t value) {
     
     i8080_flag_update_ac_ari(cpu, cpu->registers.a, -value);
     i8080_flag_update_zsp(cpu, result);
+}
+
+/* 인텔 8080 명령어: `PUSH rp(X, Y)` */
+INST_IMPL void _i_push(CPU *cpu, uint8_t *rx, uint8_t *ry) {
+    cpu->buses.ram[cpu->registers.stack_ptr - 1] = *rx;
+    cpu->buses.ram[cpu->registers.stack_ptr - 2] = *ry;
+    
+    cpu->registers.stack_ptr -= 2;
+}
+
+/* 인텔 8080 명령어: `POP r(X, Y)` */
+INST_IMPL void _i_pop(CPU *cpu, uint8_t *rx, uint8_t *ry) {
+    *rx = cpu->buses.ram[cpu->registers.stack_ptr + 1];
+    *ry = cpu->buses.ram[cpu->registers.stack_ptr];
+    
+    cpu->registers.stack_ptr += 2;
 }
 
 /* 인텔 8080 명령어: `RST n` */
@@ -792,7 +808,11 @@ INST_IMPL void i_mov_b_l(CPU *cpu, Operands ops) {
 
 /* 인텔 8080 명령어: `MOV r(B), mem` (0x46) */
 INST_IMPL void i_mov_b_mem(CPU *cpu, Operands ops) {
-    cpu->registers.b = i8080_mem_read_hl(cpu);
+    cpu->registers.b = i8080_mem_read(
+        cpu, 
+        &cpu->registers.h, 
+        &cpu->registers.l
+    );
 }
 
 /* 인텔 8080 명령어: `MOV r(B), r(A)` (0x47) */
@@ -832,7 +852,11 @@ INST_IMPL void i_mov_c_l(CPU *cpu, Operands ops) {
 
 /* 인텔 8080 명령어: `MOV r(C), mem` (0x4e) */
 INST_IMPL void i_mov_c_mem(CPU *cpu, Operands ops) {
-    cpu->registers.c = i8080_mem_read_hl(cpu);
+    cpu->registers.c = i8080_mem_read(
+        cpu, 
+        &cpu->registers.h, 
+        &cpu->registers.l
+    );
 }
 
 /* 인텔 8080 명령어: `MOV r(C), r(A)` (0x4f) */
@@ -872,7 +896,11 @@ INST_IMPL void i_mov_d_l(CPU *cpu, Operands ops) {
 
 /* 인텔 8080 명령어: `MOV r(D), mem` (0x56) */
 INST_IMPL void i_mov_d_mem(CPU *cpu, Operands ops) {
-    cpu->registers.d = i8080_mem_read_hl(cpu);
+    cpu->registers.d = i8080_mem_read(
+        cpu, 
+        &cpu->registers.h, 
+        &cpu->registers.l
+    );
 }
 
 /* 인텔 8080 명령어: `MOV r(D), r(A)` (0x57) */
@@ -912,7 +940,11 @@ INST_IMPL void i_mov_e_l(CPU *cpu, Operands ops) {
 
 /* 인텔 8080 명령어: `MOV r(E), mem` (0x5e) */
 INST_IMPL void i_mov_e_mem(CPU *cpu, Operands ops) {
-    cpu->registers.e = i8080_mem_read_hl(cpu);
+    cpu->registers.e = i8080_mem_read(
+        cpu, 
+        &cpu->registers.h, 
+        &cpu->registers.l
+    );
 }
 
 /* 인텔 8080 명령어: `MOV r(E), r(A)` (0x5f) */
@@ -952,7 +984,11 @@ INST_IMPL void i_mov_h_l(CPU *cpu, Operands ops) {
 
 /* 인텔 8080 명령어: `MOV r(H), mem` (0x66) */
 INST_IMPL void i_mov_h_mem(CPU *cpu, Operands ops) {
-    cpu->registers.h = i8080_mem_read_hl(cpu);
+    cpu->registers.h = i8080_mem_read(
+        cpu, 
+        &cpu->registers.h, 
+        &cpu->registers.l
+    );
 }
 
 /* 인텔 8080 명령어: `MOV r(H), r(A)` (0x67) */
@@ -992,7 +1028,11 @@ INST_IMPL void i_mov_l_l(CPU *cpu, Operands ops) {
 
 /* 인텔 8080 명령어: `MOV r(L), mem` (0x6e) */
 INST_IMPL void i_mov_l_mem(CPU *cpu, Operands ops) {
-    cpu->registers.l = i8080_mem_read_hl(cpu);
+    cpu->registers.l = i8080_mem_read(
+        cpu, 
+        &cpu->registers.h, 
+        &cpu->registers.l
+    );
 }
 
 /* 인텔 8080 명령어: `MOV r(L), r(A)` (0x6f) */
@@ -1002,37 +1042,72 @@ INST_IMPL void i_mov_l_a(CPU *cpu, Operands ops) {
 
 /* 인텔 8080 명령어: `MOV mem, r(B)` (0x70) */
 INST_IMPL void i_mov_mem_b(CPU *cpu, Operands ops) {
-    i8080_mem_write_hl(cpu, cpu->registers.b);
+    i8080_mem_write(
+        cpu, 
+        &cpu->registers.h, 
+        &cpu->registers.l, 
+        cpu->registers.b
+    );
 }
 
 /* 인텔 8080 명령어: `MOV mem, r(C)` (0x71) */
 INST_IMPL void i_mov_mem_c(CPU *cpu, Operands ops) {
-    i8080_mem_write_hl(cpu, cpu->registers.c);
+    i8080_mem_write(
+        cpu, 
+        &cpu->registers.h, 
+        &cpu->registers.l, 
+        cpu->registers.c
+    );
 }
 
 /* 인텔 8080 명령어: `MOV mem, r(D)` (0x72) */
 INST_IMPL void i_mov_mem_d(CPU *cpu, Operands ops) {
-    i8080_mem_write_hl(cpu, cpu->registers.d);
+    i8080_mem_write(
+        cpu, 
+        &cpu->registers.h, 
+        &cpu->registers.l, 
+        cpu->registers.d
+    );
 }
 
 /* 인텔 8080 명령어: `MOV mem, r(E)` (0x73) */
 INST_IMPL void i_mov_mem_e(CPU *cpu, Operands ops) {
-    i8080_mem_write_hl(cpu, cpu->registers.e);
+    i8080_mem_write(
+        cpu, 
+        &cpu->registers.h, 
+        &cpu->registers.l, 
+        cpu->registers.e
+    );
 }
 
 /* 인텔 8080 명령어: `MOV mem, r(H)` (0x74) */
 INST_IMPL void i_mov_mem_h(CPU *cpu, Operands ops) {
-    i8080_mem_write_hl(cpu, cpu->registers.h);
+    i8080_mem_write(
+        cpu, 
+        &cpu->registers.h, 
+        &cpu->registers.l, 
+        cpu->registers.h
+    );
 }
 
 /* 인텔 8080 명령어: `MOV mem, r(L)` (0x75) */
 INST_IMPL void i_mov_mem_l(CPU *cpu, Operands ops) {
-    i8080_mem_write_hl(cpu, cpu->registers.l);
+    i8080_mem_write(
+        cpu, 
+        &cpu->registers.h, 
+        &cpu->registers.l, 
+        cpu->registers.l
+    );
 }
 
 /* 인텔 8080 명령어: `MOV mem, r(A)` (0x77) */
 INST_IMPL void i_mov_mem_a(CPU *cpu, Operands ops) {
-    i8080_mem_write_hl(cpu, cpu->registers.a);
+    i8080_mem_write(
+        cpu, 
+        &cpu->registers.h, 
+        &cpu->registers.l, 
+        cpu->registers.a
+    );
 }
 
 /* 인텔 8080 명령어: `MOV r(A), r(B)` (0x78) */
@@ -1067,7 +1142,11 @@ INST_IMPL void i_mov_a_l(CPU *cpu, Operands ops) {
 
 /* 인텔 8080 명령어: `MOV r(A), mem` (0x7e) */
 INST_IMPL void i_mov_a_mem(CPU *cpu, Operands ops) {
-    cpu->registers.a = i8080_mem_read_hl(cpu);
+    cpu->registers.a = i8080_mem_read(
+        cpu, 
+        &cpu->registers.h, 
+        &cpu->registers.l
+    );
 }
 
 /* 인텔 8080 명령어: `MOV r(A), r(E)` (0x7f) */
@@ -1107,7 +1186,7 @@ INST_IMPL void i_mvi_l_data8(CPU *cpu, Operands ops) {
 
 /* 인텔 8080 명령어: `MVI mem, data(8)` (0x36) */
 INST_IMPL void i_mvi_mem_data8(CPU *cpu, Operands ops) {
-    i8080_mem_write_hl(cpu, ops.operand1);
+    i8080_mem_write(cpu, &cpu->registers.h, &cpu->registers.l, ops.operand1);
 }
 
 /* 인텔 8080 명령어: `MVI r(A), data(8)` (0x3e) */
@@ -1140,16 +1219,12 @@ INST_IMPL void i_lxi_sp_data16(CPU *cpu, Operands ops) {
 
 /* 인텔 8080 명령어: `LDA addr` (0x3a) */
 INST_IMPL void i_lda_addr(CPU *cpu, Operands ops) {
-    uint16_t mem_offset = (ops.operand2 << 8) | ops.operand1;
-    
-    cpu->registers.a = cpu->buses.ram[mem_offset];
+    cpu->registers.a = i8080_mem_read(cpu, &ops.operand2, &ops.operand1);
 }
 
 /* 인텔 8080 명령어: `STA addr` (0x32) */
 INST_IMPL void i_sta_addr(CPU *cpu, Operands ops) {
-    uint16_t mem_offset = (ops.operand2 << 8) | ops.operand1;
-    
-    cpu->buses.ram[mem_offset] = cpu->registers.a;
+    i8080_mem_write(cpu, &ops.operand2, &ops.operand1, cpu->registers.a);
 }
 
 /* 인텔 8080 명령어: `LHLD addr` (0x2a) */
@@ -1170,30 +1245,22 @@ INST_IMPL void i_shld_addr(CPU *cpu, Operands ops) {
 
 /* 인텔 8080 명령어: `LDAX rp(B, C)` (0x0a) */
 INST_IMPL void i_ldax_bc(CPU *cpu, Operands ops) {
-    uint16_t mem_offset = (cpu->registers.b << 8) | cpu->registers.c;
-    
-    cpu->registers.a = cpu->buses.ram[mem_offset];
+    cpu->registers.a = i8080_mem_read(cpu, &cpu->registers.b, &cpu->registers.c);
 }
 
 /* 인텔 8080 명령어: `LDAX rp(D, E)` (0x1a) */
 INST_IMPL void i_ldax_de(CPU *cpu, Operands ops) {
-    uint16_t mem_offset = (cpu->registers.d << 8) | cpu->registers.e;
-    
-    cpu->registers.a = cpu->buses.ram[mem_offset];
+    cpu->registers.a = i8080_mem_read(cpu, &cpu->registers.d, &cpu->registers.e);
 }
 
 /* 인텔 8080 명령어: `STAX rp(B, C)` (0x02) */
-INST_IMPL void i_stax_bc(CPU *cpu, Operands ops) {
-    uint16_t mem_offset = (cpu->registers.b << 8) | cpu->registers.c;
-    
-    cpu->buses.ram[mem_offset] = cpu->registers.a;
+INST_IMPL void i_stax_bc(CPU *cpu, Operands ops) {  
+    i8080_mem_write(cpu, &cpu->registers.b, &cpu->registers.c, cpu->registers.a);
 }
 
 /* 인텔 8080 명령어: `STAX rp(D, E)` (0x12) */
 INST_IMPL void i_stax_de(CPU *cpu, Operands ops) {
-    uint16_t mem_offset = (cpu->registers.d << 8) | cpu->registers.e;
-    
-    cpu->buses.ram[mem_offset] = cpu->registers.a;
+    i8080_mem_write(cpu, &cpu->registers.d, &cpu->registers.e, cpu->registers.a);
 }
 
 /* 인텔 8080 명령어: `XCHG` (0xeb) */
@@ -2114,66 +2181,42 @@ INST_IMPL void i_pchl(CPU *cpu, Operands ops) {
 
 /* 인텔 8080 명령어: `PUSH rp(B, C)` (0xc5) */
 INST_IMPL void i_push_bc(CPU *cpu, Operands ops) {
-    cpu->buses.ram[cpu->registers.stack_ptr - 1] = cpu->registers.b;
-    cpu->buses.ram[cpu->registers.stack_ptr - 2] = cpu->registers.c;
-    
-    cpu->registers.stack_ptr -= 2;
+    _i_push(cpu, &cpu->registers.b, &cpu->registers.c);
 }
 
 /* 인텔 8080 명령어: `PUSH rp(D, E)` (0xd5) */
 INST_IMPL void i_push_de(CPU *cpu, Operands ops) {
-    cpu->buses.ram[cpu->registers.stack_ptr - 1] = cpu->registers.d;
-    cpu->buses.ram[cpu->registers.stack_ptr - 2] = cpu->registers.e;
-    
-    cpu->registers.stack_ptr -= 2;
+    _i_push(cpu, &cpu->registers.d, &cpu->registers.e);
 }
 
 /* 인텔 8080 명령어: `PUSH rp(H, L)` (0xe5) */
 INST_IMPL void i_push_hl(CPU *cpu, Operands ops) {
-    cpu->buses.ram[cpu->registers.stack_ptr - 1] = cpu->registers.h;
-    cpu->buses.ram[cpu->registers.stack_ptr - 2] = cpu->registers.l;
-    
-    cpu->registers.stack_ptr -= 2;
+    _i_push(cpu, &cpu->registers.h, &cpu->registers.l);
 }
 
 /* 인텔 8080 명령어: `PUSH psw` (0xf5) */
 INST_IMPL void i_push_psw(CPU *cpu, Operands ops) {
-    cpu->buses.ram[cpu->registers.stack_ptr - 1] = cpu->registers.a;
-    cpu->buses.ram[cpu->registers.stack_ptr - 2] = cpu->registers.status;
-    
-    cpu->registers.stack_ptr -= 2;
+    _i_push(cpu, &cpu->registers.a, &cpu->registers.status);
 }
 
 /* 인텔 8080 명령어: `POP rp(B, C)` (0xc1) */
 INST_IMPL void i_pop_bc(CPU *cpu, Operands ops) {
-    cpu->registers.b = cpu->buses.ram[cpu->registers.stack_ptr + 1];
-    cpu->registers.c = cpu->buses.ram[cpu->registers.stack_ptr];
-    
-    cpu->registers.stack_ptr += 2;
+    _i_pop(cpu, &cpu->registers.b, &cpu->registers.c);
 }
 
 /* 인텔 8080 명령어: `POP rp(D, E)` (0xd1) */
 INST_IMPL void i_pop_de(CPU *cpu, Operands ops) {
-    cpu->registers.d = cpu->buses.ram[cpu->registers.stack_ptr + 1];
-    cpu->registers.e = cpu->buses.ram[cpu->registers.stack_ptr];
-    
-    cpu->registers.stack_ptr += 2;
+    _i_pop(cpu, &cpu->registers.d, &cpu->registers.e);
 }
 
 /* 인텔 8080 명령어: `POP rp(H, L)` (0xe1) */
 INST_IMPL void i_pop_hl(CPU *cpu, Operands ops) {
-    cpu->registers.h = cpu->buses.ram[cpu->registers.stack_ptr + 1];
-    cpu->registers.l = cpu->buses.ram[cpu->registers.stack_ptr];
-    
-    cpu->registers.stack_ptr += 2;
+    _i_pop(cpu, &cpu->registers.h, &cpu->registers.l);
 }
 
 /* 인텔 8080 명령어: `POP psw` (0xf1) */
 INST_IMPL void i_pop_psw(CPU *cpu, Operands ops) {
-    cpu->registers.a = cpu->buses.ram[cpu->registers.stack_ptr + 1];
-    cpu->registers.status = cpu->buses.ram[cpu->registers.stack_ptr];
-    
-    cpu->registers.stack_ptr += 2;
+    _i_pop(cpu, &cpu->registers.a, &cpu->registers.status);
 }
 
 /* 인텔 8080 명령어: `XTHL` (0xe3) */
