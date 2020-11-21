@@ -339,7 +339,7 @@ const Instruction instruction_set[256] = {
     { "RST 7", 1, i_rst_7 },
 };
 
-/* 인텔 8080 진단 프로그램을 실행한다. */
+/* 인텔 8080 CPU 진단 프로그램을 실행한다. */
 CPU_IMPL void i8080_cpudiag(CPU *cpu) {
     size_t file_size;
     
@@ -444,12 +444,6 @@ CPU_IMPL void i8080_emulate(CPU *cpu) {
             i8080_flag_get(cpu, SR_FLAG_AUX_CARRY),
             i8080_flag_get(cpu, SR_FLAG_ZERO),
             i8080_flag_get(cpu, SR_FLAG_SIGN)
-        );
-#else
-        info(
-            "areum (0x%04x): %s\n",
-            cpu->registers.prog_ctr,
-            instruction_set[*op_code].name
         );
 #endif
         cpu->registers.prog_ctr += instruction_set[*op_code].size;
@@ -1635,17 +1629,20 @@ INST_IMPL void i_daa(CPU *cpu, Operands ops) {
     
     result = cpu->registers.a;
     
-    if ((cpu->registers.a & 0x0f) > 0x09 
-        || i8080_flag_get(cpu, SR_FLAG_AUX_CARRY)) {
+    if ((result & 0x0f) > 0x09 || i8080_flag_get(cpu, SR_FLAG_AUX_CARRY)) {
         result += 0x06;
-        i8080_flag_set(cpu, SR_FLAG_CARRY);
+        
+        if ((result & 0xf0) || i8080_flag_get(cpu, SR_FLAG_CARRY))
+            i8080_flag_set(cpu, SR_FLAG_CARRY);
+        
+        i8080_flag_set(cpu, SR_FLAG_AUX_CARRY);
     } else {
         i8080_flag_clear(cpu, SR_FLAG_AUX_CARRY);
     }
     
-    if (cpu->registers.a > 0x9f 
-        || i8080_flag_get(cpu, SR_FLAG_CARRY)) {
+    if (result > 0x9f || i8080_flag_get(cpu, SR_FLAG_CARRY)) {
         result += 0x60;
+        
         i8080_flag_set(cpu, SR_FLAG_CARRY);
     } else {
         i8080_flag_clear(cpu, SR_FLAG_CARRY);

@@ -92,8 +92,8 @@ typedef struct instruction {
 
 /* 인텔 8080 CPU의 명령어 집합 (0x00 - 0xff) */
 extern const Instruction instruction_set[256];
- 
-/* 인텔 8080 CPU의 진단 프로그램을 실행한다. */
+
+/* 인텔 8080 CPU 진단 프로그램을 실행한다. */
 CPU_IMPL void i8080_cpudiag(CPU *cpu);
 
 /* 인텔 8080 CPU를 에뮬레이트한다. */
